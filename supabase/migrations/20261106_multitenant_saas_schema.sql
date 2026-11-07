@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS public.shops (
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
+-- Add shop_id column to profiles if table already exists without it
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS shop_id UUID;
+
 -- Add foreign key constraint for profiles.shop_id -> shops.id if not already present
 DO $$ BEGIN
   ALTER TABLE public.profiles
@@ -73,6 +76,7 @@ DO $$ BEGIN
     FOREIGN KEY (shop_id) REFERENCES public.shops(id) ON DELETE SET NULL;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN undefined_object THEN null;
 END $$;
 
 -- 5. Categories Table (Shop-isolated)
