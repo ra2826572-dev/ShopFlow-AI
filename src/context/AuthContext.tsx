@@ -69,30 +69,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const syncProfileWithServer = async (email: string) => {
       try {
         const res = await fetch(`/api/auth/profile?email=${encodeURIComponent(email)}`);
-        const data = await res.json();
-        if (data.success && data.user) {
-          const verifiedUser: UserProfile = {
-            id: data.user.id,
-            first_name: data.user.first_name,
-            last_name: data.user.last_name,
-            name: data.user.name,
-            email: data.user.email,
-            shopId: data.user.shop_id || null,
-            shopName: data.user.shopName || '',
-            businessName: data.user.shopName || '',
-            businessId: data.user.shop_id || '',
-            role: data.user.role,
-            needsShopSetup: data.user.needsShopSetup
-          };
-          setUser(verifiedUser);
-          localStorage.setItem('shopflow_auth_user', JSON.stringify(verifiedUser));
+        const contentType = res.headers.get('content-type');
+        if (res.ok && contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.success && data.user) {
+            const verifiedUser: UserProfile = {
+              id: data.user.id,
+              first_name: data.user.first_name,
+              last_name: data.user.last_name,
+              name: data.user.name,
+              email: data.user.email,
+              shopId: data.user.shop_id || null,
+              shopName: data.user.shopName || '',
+              businessName: data.user.shopName || '',
+              businessId: data.user.shop_id || '',
+              role: data.user.role,
+              needsShopSetup: data.user.needsShopSetup
+            };
+            setUser(verifiedUser);
+            localStorage.setItem('shopflow_auth_user', JSON.stringify(verifiedUser));
 
-          if (verifiedUser.role === 'super_admin') {
-            setAuthView('admin');
-          } else if (verifiedUser.needsShopSetup || !verifiedUser.shopId) {
-            setAuthView('shop-setup');
-          } else {
-            setAuthView('app');
+            if (verifiedUser.role === 'super_admin') {
+              setAuthView('admin');
+            } else if (verifiedUser.needsShopSetup || !verifiedUser.shopId) {
+              setAuthView('shop-setup');
+            } else {
+              setAuthView('app');
+            }
           }
         }
       } catch (err) {
@@ -144,6 +147,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 2. Fetch server-verified profile and shop from database
       const profileRes = await fetch(`/api/auth/profile?email=${encodeURIComponent(authUserEmail)}`);
+      const profileContentType = profileRes.headers.get('content-type');
+      if (!profileRes.ok || !profileContentType || !profileContentType.includes('application/json')) {
+        setLoading(false);
+        return { error: 'User profile not found in database. Please register first.' };
+      }
       const profileData = await profileRes.json();
 
       if (!profileData.success || !profileData.user) {
@@ -231,6 +239,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           userId: authUserId
         })
       });
+
+      const regContentType = regRes.headers.get('content-type');
+      if (!regRes.ok || !regContentType || !regContentType.includes('application/json')) {
+        setLoading(false);
+        return { error: 'Failed to register account in database (Server error)' };
+      }
 
       const regData = await regRes.json();
       if (!regData.success) {
