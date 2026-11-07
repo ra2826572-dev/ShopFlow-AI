@@ -385,14 +385,20 @@ class ShopFlowDatabase {
     });
   }
 
-  // --- 1. USER REGISTRATION (Profile Only - No Pre-Seeded Shop or Demo Data) ---
+  // --- 1. USER REGISTRATION (Personal Details + Custom Shop Creation) ---
   public registerNewUser(params: {
     firstName: string;
     lastName: string;
     email: string;
     userId?: string;
+    shopName?: string;
+    logoUrl?: string;
+    description?: string;
+    currency?: string;
+    phone?: string;
+    address?: string;
   }) {
-    const { firstName, lastName, email, userId } = params;
+    const { firstName, lastName, email, userId, shopName, logoUrl = '', description = '', currency = 'PKR', phone = '', address = '' } = params;
     const trimmedFirst = firstName.trim();
     const trimmedLast = lastName.trim();
     const normalizedEmail = email.toLowerCase().trim();
@@ -406,13 +412,15 @@ class ShopFlowDatabase {
     const finalUserId = userId || crypto.randomUUID();
     const fullName = `${trimmedFirst} ${trimmedLast}`;
 
-    // Security: ra2826572@gmail.com is super_admin, all others are strictly 'shop_owner'
     const role: 'shop_owner' | 'super_admin' = normalizedEmail === 'ra2826572@gmail.com' ? 'super_admin' : 'shop_owner';
+    const shopId = crypto.randomUUID();
+    const finalShopName = shopName && shopName.trim() ? shopName.trim() : `${trimmedFirst}'s Shop`;
+    const currencySymbol = currency === 'USD' ? '$' : currency === 'AED' ? 'د.إ' : currency === 'EUR' ? '€' : '₨';
 
     try {
       this.db.prepare(`
-        INSERT INTO profiles (id, first_name, last_name, name, email, role, status, shop_id, created_at, updated_at, last_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+        INSERT INTO profiles (id, first_name, last_name, name, email, role, status, shop_id, phone, created_at, updated_at, last_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         finalUserId,
         trimmedFirst,
@@ -421,8 +429,39 @@ class ShopFlowDatabase {
         normalizedEmail,
         role,
         'Active',
+        shopId,
+        phone.trim() || null,
         now,
         now,
+        now
+      );
+
+      // Create initial tenant shop with user provided details & logo
+      this.db.prepare(`
+        INSERT INTO shops (id, owner_id, name, logo_url, description, category, currency, currency_symbol, tax_rate, phone, address, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'Retail Store', ?, ?, 5.0, ?, ?, 'Active', ?, ?)
+      `).run(
+        shopId,
+        finalUserId,
+        finalShopName,
+        logoUrl.trim(),
+        description.trim(),
+        currency,
+        currencySymbol,
+        phone.trim() || null,
+        address.trim() || null,
+        now,
+        now
+      );
+
+      // Initial welcome notification
+      this.db.prepare(`
+        INSERT INTO notifications (id, shop_id, title, message, type, time, read, created_at)
+        VALUES (?, ?, 'Shop Activated', ?, 'success', 'Just now', 0, ?)
+      `).run(
+        'notif_' + Date.now(),
+        shopId,
+        `Welcome to ${finalShopName}! Your shop is now active and ready for business.`,
         now
       );
 
@@ -432,7 +471,7 @@ class ShopFlowDatabase {
         'System',
         'USER_REGISTERED',
         normalizedEmail,
-        `User ${fullName} (${normalizedEmail}) registered. Redirecting to shop setup.`
+        `User ${fullName} (${normalizedEmail}) registered. Shop "${finalShopName}" provisioned.`
       );
 
       return {
@@ -444,8 +483,9 @@ class ShopFlowDatabase {
           name: createdUser.name,
           email: createdUser.email,
           role: createdUser.role,
-          shop_id: null,
-          needsShopSetup: true
+          shop_id: shopId,
+          shopName: finalShopName,
+          needsShopSetup: false
         }
       };
     } catch (err: any) {
@@ -979,22 +1019,27 @@ class ShopFlowDatabase {
     const adminProfile = this.getProfileByEmail(adminEmail);
     const adminShopId = adminProfile?.shop_id || 'b0000000-0000-4000-8000-000000000001';
 
-    // Delete all non-admin profiles
-    this.db.prepare("DELETE FROM profiles WHERE lower(email) != lower(?)").run(adminEmail);
-
-    // Delete all shops except admin shop
-    this.db.prepare("DELETE FROM shops WHERE id != ?").run(adminShopId);
+    this.db.exec("PRAGMA foreign_keys = OFF;");
 
     // Delete all dependent records where shop_id != adminShopId
+    this.db.prepare("DELETE FROM order_items WHERE shop_id != ?").run(adminShopId);
+    this.db.prepare("DELETE FROM orders WHERE shop_id != ?").run(adminShopId);
     this.db.prepare("DELETE FROM products WHERE shop_id != ?").run(adminShopId);
     this.db.prepare("DELETE FROM categories WHERE shop_id != ?").run(adminShopId);
-    this.db.prepare("DELETE FROM orders WHERE shop_id != ?").run(adminShopId);
-    this.db.prepare("DELETE FROM order_items WHERE shop_id != ?").run(adminShopId);
     this.db.prepare("DELETE FROM customers WHERE shop_id != ?").run(adminShopId);
     this.db.prepare("DELETE FROM suppliers WHERE shop_id != ?").run(adminShopId);
     this.db.prepare("DELETE FROM expenses WHERE shop_id != ?").run(adminShopId);
     this.db.prepare("DELETE FROM staff WHERE shop_id != ?").run(adminShopId);
     this.db.prepare("DELETE FROM notifications WHERE shop_id != ?").run(adminShopId);
+
+    // Delete all shops and businesses except admin
+    this.db.prepare("DELETE FROM shops WHERE id != ?").run(adminShopId);
+    try { this.db.prepare("DELETE FROM businesses WHERE id != ?").run(adminShopId); } catch {}
+
+    // Delete all non-admin profiles
+    this.db.prepare("DELETE FROM profiles WHERE lower(email) != lower(?)").run(adminEmail);
+
+    this.db.exec("PRAGMA foreign_keys = ON;");
 
     this.logAdminAction(adminEmail, 'PLATFORM_RESET', 'All Users & Shops', 'Deleted all non-admin users, shops, products, orders, and test data.');
   }

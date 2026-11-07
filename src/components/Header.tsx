@@ -129,14 +129,6 @@ export const Header: React.FC = () => {
                 >
                   <Lock className="w-4 h-4" /> Change Password
                 </button>
-                {user?.role === 'super_admin' && (
-                  <button
-                    onClick={() => { setAuthView('admin'); setShowProfileMenu(false); }}
-                    className="w-full px-4 py-2 text-left text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors font-semibold"
-                  >
-                    <ShieldAlert className="w-4 h-4" /> Go to Admin Panel
-                  </button>
-                )}
               </div>
               <div className="py-1">
                 <button

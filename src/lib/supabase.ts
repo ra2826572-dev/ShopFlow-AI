@@ -1,23 +1,34 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+const DEFAULT_SUPABASE_URL = 'https://qajhvatgotcdpjvntyrf.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_DVT21emSwZ-4sE6gorTk_Q_knWVLkJw';
+
 const getInitialUrl = () => {
   try {
     const saved = localStorage.getItem('shopflow_supabase_url');
-    if (saved && saved.trim()) return saved.trim();
+    if (saved && saved.trim() && !saved.includes('placeholder')) return saved.trim();
   } catch (e) {
     // ignore
   }
-  return import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+  return (
+    import.meta.env.VITE_SUPABASE_URL ||
+    (import.meta.env as any).NEXT_PUBLIC_SUPABASE_URL ||
+    DEFAULT_SUPABASE_URL
+  );
 };
 
 const getInitialKey = () => {
   try {
     const saved = localStorage.getItem('shopflow_supabase_anon_key');
-    if (saved && saved.trim()) return saved.trim();
+    if (saved && saved.trim() && saved !== 'placeholder-key') return saved.trim();
   } catch (e) {
     // ignore
   }
-  return import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
+  return (
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    (import.meta.env as any).NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    DEFAULT_SUPABASE_KEY
+  );
 };
 
 let currentUrl = getInitialUrl();

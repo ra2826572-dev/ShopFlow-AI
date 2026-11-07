@@ -18,8 +18,6 @@ import { AIAdvisorModal } from './components/AIAdvisorModal';
 import { SignIn } from './components/SignIn';
 import { SignUp } from './components/SignUp';
 import { ForgotPassword } from './components/ForgotPassword';
-import { AdminPanel } from './components/AdminPanel';
-import { ShopSetup } from './components/ShopSetup';
 import { Loader2 } from 'lucide-react';
 
 const MainContent: React.FC = () => {
@@ -68,24 +66,15 @@ const AppShell: React.FC = () => {
   const { user, authView } = useAuth();
 
   if (!user || authView === 'signin') {
-    return <SignIn />;
+    return <SignIn initialMode="signin" />;
   }
   if (authView === 'signup') {
-    return <SignUp />;
+    return <SignIn initialMode="signup" />;
   }
   if (authView === 'forgot') {
     return <ForgotPassword />;
   }
-  if (authView === 'shop-setup' || (user && user.needsShopSetup)) {
-    return <ShopSetup />;
-  }
-
-  // If user is super_admin and authView is admin
-  if (user.role === 'super_admin' && authView === 'admin') {
-    return <AdminPanel />;
-  }
-
-  // If normal user tries to access admin, fallback to app
+  // When user is authenticated, render the dashboard directly
   return (
     <div className="flex h-screen bg-[#11152D] overflow-hidden font-sans">
       <Sidebar />

@@ -480,9 +480,20 @@ async function startServer() {
           error: `Account Suspended: ${profile.status_reason || 'Your access is suspended by administration. Contact support@shopflow.ai'}`
         });
       }
-      const shop = profile.shop_id 
+      let shop = profile.shop_id 
         ? shopflowDb.getShopById(profile.shop_id) 
         : shopflowDb.getShopByOwnerId(profile.id);
+
+      if (!shop) {
+        const setupRes = shopflowDb.createShopForUser({
+          userId: profile.id,
+          shopName: `${profile.first_name || profile.name || 'My'}'s Shop`,
+          currency: 'PKR'
+        });
+        if (setupRes.success && setupRes.shop) {
+          shop = setupRes.shop;
+        }
+      }
 
       return res.json({
         success: true,
@@ -495,11 +506,11 @@ async function startServer() {
           role: profile.role,
           shop_id: shop ? shop.id : null,
           businessId: shop ? shop.id : null,
-          shopName: shop ? shop.name : '',
-          businessName: shop ? shop.name : '',
+          shopName: shop ? shop.name : 'My Shop',
+          businessName: shop ? shop.name : 'My Shop',
           status: profile.status,
           phone: profile.phone,
-          needsShopSetup: !shop,
+          needsShopSetup: false,
           createdAt: profile.created_at,
           lastActive: profile.last_active
         },
@@ -513,9 +524,9 @@ async function startServer() {
     });
   });
 
-  // 2. New User Registration (Keeps registration strictly First Name, Last Name, Email, Password)
+  // 2. New User Registration (Personal Details + Custom Shop Setup)
   app.post('/api/auth/register', (req, res) => {
-    const { firstName, lastName, email, userId } = req.body;
+    const { firstName, lastName, email, userId, shopName, logoUrl, description, currency, phone, address } = req.body;
     
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ 
@@ -528,7 +539,13 @@ async function startServer() {
       firstName,
       lastName,
       email,
-      userId
+      userId,
+      shopName,
+      logoUrl,
+      description,
+      currency,
+      phone,
+      address
     });
 
     if (!regResult.success) {

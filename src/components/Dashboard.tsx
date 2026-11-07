@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, 
   ShoppingBag, 
@@ -9,19 +9,62 @@ import {
   CheckCircle2, 
   Info, 
   Rocket, 
-  ArrowRight,
-  Plus,
-  Store,
-  Sparkles
+  ArrowRight, 
+  Plus, 
+  Store, 
+  Sparkles, 
+  Edit3, 
+  X, 
+  Save, 
+  Loader2, 
+  Building2, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Coins 
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 
 export const Dashboard: React.FC = () => {
-  const { data, setActiveTab, fetchAIInsights } = useApp();
+  const { data, setActiveTab, fetchAIInsights, updateSettings } = useApp();
   const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<'7D' | '30D' | '3M' | '1Y'>('30D');
+
+  // Shop details modal state
+  const [showShopModal, setShowShopModal] = useState<boolean>(false);
+  const [savingShop, setSavingShop] = useState<boolean>(false);
+  const [shopSaveSuccess, setShopSaveSuccess] = useState<boolean>(false);
+
+  const business = data?.business || data?.shop;
+  const [shopForm, setShopForm] = useState({
+    name: business?.name || user?.shopName || 'My Store',
+    tagline: business?.description || (business as any)?.tagline || '',
+    currency: business?.currency || 'PKR',
+    currencySymbol: business?.currencySymbol || '₨',
+    taxRate: business?.taxRate || 5,
+    email: business?.email || user?.email || '',
+    phone: business?.phone || '',
+    address: business?.address || '',
+  });
+
+  // Sync form when data changes
+  useEffect(() => {
+    if (data?.business || data?.shop) {
+      const b = data?.business || data?.shop;
+      setShopForm({
+        name: b?.name || user?.shopName || 'My Store',
+        tagline: b?.description || (b as any)?.tagline || '',
+        currency: b?.currency || 'PKR',
+        currencySymbol: b?.currencySymbol || '₨',
+        taxRate: b?.taxRate || 5,
+        email: b?.email || user?.email || '',
+        phone: b?.phone || '',
+        address: b?.address || '',
+      });
+    }
+  }, [data?.business, data?.shop, user?.shopName, user?.email]);
 
   const displayName = user?.first_name || user?.name?.split(' ')[0] || 'Owner';
   const shopName = data?.shop?.name || data?.business?.name || user?.shopName || 'Your Shop';
@@ -72,6 +115,18 @@ export const Dashboard: React.FC = () => {
 
   const chartData = generateChartData();
 
+  const handleSaveShop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingShop(true);
+    await updateSettings(shopForm);
+    setSavingShop(false);
+    setShopSaveSuccess(true);
+    setTimeout(() => {
+      setShopSaveSuccess(false);
+      setShowShopModal(false);
+    }, 1200);
+  };
+
   return (
     <div className="p-6 sm:p-8 space-y-8 pb-16 font-sans">
       
@@ -81,14 +136,32 @@ export const Dashboard: React.FC = () => {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/15 backdrop-blur-md mb-3 border border-white/20">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Multi-Tenant Shop Active</span>
+            <span>Store Dashboard Active</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-2">
             Welcome, {displayName}! 👋
           </h2>
           <p className="text-purple-100 text-sm md:text-base leading-relaxed">
-            Managing <strong className="text-white font-bold">{shopName}</strong>. Your tenant environment is isolated and secured with Supabase Row Level Security.
+            Managing <strong className="text-white font-bold">{shopName}</strong>. You can customize your store details, track sales, and manage inventory right here.
           </p>
+
+          {/* Quick Shop Details CTA Buttons */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowShopModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-purple-700 font-bold text-xs shadow-md hover:bg-purple-50 transition-all cursor-pointer"
+            >
+              <Edit3 className="w-4 h-4" />
+              <span>Update Shop Details</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all cursor-pointer"
+            >
+              <span>Store Settings</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
         <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden lg:flex items-center gap-4">
           <div className="w-24 h-24 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-2xl">
@@ -96,6 +169,194 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Shop Identity & Details Strip */}
+      <div className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-purple-600/30 shrink-0">
+            {shopName ? shopName.slice(0, 2).toUpperCase() : 'SF'}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-extrabold text-slate-900 text-base">{shopName}</h3>
+              <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60">
+                {shopForm.currency} ({currencySymbol})
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {shopForm.tagline || 'Manage your business, inventory, and point of sale'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-slate-500 hidden sm:block text-right">
+            <div><strong className="text-slate-700">Owner:</strong> {user?.name || displayName}</div>
+            <div className="text-[11px] text-slate-400">{user?.email}</div>
+          </div>
+          <button
+            onClick={() => setShowShopModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/70 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>Edit Details</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Shop Details Edit Modal */}
+      {showShopModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
+                  <Store className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Your Shop Details</h3>
+                  <p className="text-xs text-slate-500">Customize your shop identity and business info</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowShopModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {shopSaveSuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Shop details updated successfully!</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveShop} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Shop Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={shopForm.name}
+                  onChange={(e) => setShopForm({ ...shopForm, name: e.target.value })}
+                  placeholder="e.g. Khan Mobile & Electronics"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Shop Tagline / Description
+                </label>
+                <input
+                  type="text"
+                  value={shopForm.tagline}
+                  onChange={(e) => setShopForm({ ...shopForm, tagline: e.target.value })}
+                  placeholder="e.g. Best smartphones, accessories, and repairs"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Currency
+                  </label>
+                  <select
+                    value={shopForm.currency}
+                    onChange={(e) => {
+                      const curr = e.target.value;
+                      const sym = curr === 'PKR' ? '₨' : curr === 'USD' ? '$' : curr === 'AED' ? 'د.إ' : curr === 'EUR' ? '€' : '£';
+                      setShopForm({ ...shopForm, currency: curr, currencySymbol: sym });
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  >
+                    <option value="PKR">PKR (₨)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="AED">AED (د.إ)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Tax Rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={shopForm.taxRate}
+                    onChange={(e) => setShopForm({ ...shopForm, taxRate: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={shopForm.phone}
+                    onChange={(e) => setShopForm({ ...shopForm, phone: e.target.value })}
+                    placeholder="+92 300 1234567"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Contact Email
+                  </label>
+                  <input
+                    type="email"
+                    value={shopForm.email}
+                    onChange={(e) => setShopForm({ ...shopForm, email: e.target.value })}
+                    placeholder="shop@example.com"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Shop Physical Address
+                </label>
+                <input
+                  type="text"
+                  value={shopForm.address}
+                  onChange={(e) => setShopForm({ ...shopForm, address: e.target.value })}
+                  placeholder="e.g. Shop #12, Commercial Plaza, Karachi"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowShopModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingShop}
+                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/30 flex items-center gap-2 transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  {savingShop ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>Save Shop Details</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Fresh Shop Onboarding Callout (Shows when shop has 0 products) */}
       {totalProducts === 0 && (

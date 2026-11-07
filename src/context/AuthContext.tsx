@@ -21,13 +21,19 @@ export interface SignUpParams {
   lastName: string;
   email: string;
   password: string;
+  shopName?: string;
+  logoUrl?: string;
+  description?: string;
+  currency?: string;
+  phone?: string;
+  address?: string;
 }
 
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
-  authView: 'signin' | 'signup' | 'forgot' | 'app' | 'admin' | 'shop-setup';
-  setAuthView: (view: 'signin' | 'signup' | 'forgot' | 'app' | 'admin' | 'shop-setup') => void;
+  authView: 'signin' | 'signup' | 'forgot' | 'app';
+  setAuthView: (view: 'signin' | 'signup' | 'forgot' | 'app') => void;
   signIn: (email: string, pass: string) => Promise<{ error?: string }>;
   signUp: (params: SignUpParams) => Promise<{ error?: string; requiresEmailVerification?: boolean }>;
   signOut: () => Promise<void>;
@@ -49,15 +55,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [loading, setLoading] = useState<boolean>(false);
-  const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot' | 'app' | 'admin' | 'shop-setup'>(() => {
+  const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot' | 'app'>(() => {
     try {
       const saved = localStorage.getItem('shopflow_auth_user');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.role === 'super_admin') return 'admin';
-        if (parsed.needsShopSetup || !parsed.shopId) return 'shop-setup';
-        return 'app';
-      }
+      if (saved) return 'app';
     } catch (e) {
       // ignore
     }
@@ -84,18 +85,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               businessName: data.user.shopName || '',
               businessId: data.user.shop_id || '',
               role: data.user.role,
-              needsShopSetup: data.user.needsShopSetup
+              needsShopSetup: false
             };
             setUser(verifiedUser);
             localStorage.setItem('shopflow_auth_user', JSON.stringify(verifiedUser));
-
-            if (verifiedUser.role === 'super_admin') {
-              setAuthView('admin');
-            } else if (verifiedUser.needsShopSetup || !verifiedUser.shopId) {
-              setAuthView('shop-setup');
-            } else {
-              setAuthView('app');
-            }
+            setAuthView('app');
           }
         }
       } catch (err) {
@@ -176,16 +170,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(verifiedUser);
       localStorage.setItem('shopflow_auth_user', JSON.stringify(verifiedUser));
 
-      // 3. Multi-tenant routing:
-      if (verifiedUser.role === 'super_admin') {
-        setAuthView('admin');
-      } else if (verifiedUser.needsShopSetup || !verifiedUser.shopId) {
-        // Registered user without a shop -> Shop Setup page
-        setAuthView('shop-setup');
-      } else {
-        // User with shop -> isolated shop dashboard
-        setAuthView('app');
-      }
+      // 3. Open Store Dashboard directly
+      setAuthView('app');
 
       setLoading(false);
       return {};
@@ -197,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (params: SignUpParams): Promise<{ error?: string; requiresEmailVerification?: boolean }> => {
     setLoading(true);
-    const { firstName, lastName, email, password } = params;
+    const { firstName, lastName, email, password, shopName, logoUrl, description, currency, phone, address } = params;
     const normalizedEmail = email.toLowerCase().trim();
 
     try {
@@ -211,7 +197,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           options: {
             data: {
               first_name: firstName.trim(),
-              last_name: lastName.trim()
+              last_name: lastName.trim(),
+              shop_name: shopName?.trim()
             }
           }
         });
@@ -228,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Fallback for offline / local sandbox environment
       }
 
-      // 2. Register profile in real database (Strictly First Name, Last Name, Email)
+      // 2. Register profile & shop in database
       const regRes = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -236,7 +223,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: normalizedEmail,
-          userId: authUserId
+          userId: authUserId,
+          shopName: shopName?.trim(),
+          logoUrl: logoUrl?.trim(),
+          description: description?.trim(),
+          currency: currency || 'PKR',
+          phone: phone?.trim(),
+          address: address?.trim()
         })
       });
 
@@ -263,18 +256,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         last_name: regData.user.last_name,
         name: regData.user.name,
         email: regData.user.email,
-        shopId: null,
-        shopName: '',
-        businessName: '',
+        shopId: regData.user.shop_id || null,
+        shopName: regData.user.shopName || `${regData.user.first_name}'s Shop`,
+        businessName: regData.user.shopName || `${regData.user.first_name}'s Shop`,
         role: regData.user.role,
-        needsShopSetup: true
+        needsShopSetup: false
       };
 
       setUser(newUser);
       localStorage.setItem('shopflow_auth_user', JSON.stringify(newUser));
 
-      // After successful registration, redirect the user to Shop Setup page
-      setAuthView('shop-setup');
+      // Open dashboard directly!
+      setAuthView('app');
 
       setLoading(false);
       return {};
