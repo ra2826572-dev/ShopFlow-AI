@@ -472,22 +472,23 @@ async function startServer() {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    const profile = shopflowDb.getProfileByEmail(email);
-    if (profile) {
-      if (profile.status === 'Suspended') {
+    // If profile doesn't exist yet, auto-register them seamlessly on sign in
+    const existingProfile = shopflowDb.getProfileByEmail(email);
+    if (existingProfile) {
+      if (existingProfile.status === 'Suspended') {
         return res.status(403).json({
           success: false,
-          error: `Account Suspended: ${profile.status_reason || 'Your access is suspended by administration. Contact support@shopflow.ai'}`
+          error: `Account Suspended: ${existingProfile.status_reason || 'Your access is suspended by administration.'}`
         });
       }
-      let shop = profile.shop_id 
-        ? shopflowDb.getShopById(profile.shop_id) 
-        : shopflowDb.getShopByOwnerId(profile.id);
+      let shop = existingProfile.shop_id 
+        ? shopflowDb.getShopById(existingProfile.shop_id) 
+        : shopflowDb.getShopByOwnerId(existingProfile.id);
 
       if (!shop) {
         const setupRes = shopflowDb.createShopForUser({
-          userId: profile.id,
-          shopName: `${profile.first_name || profile.name || 'My'}'s Shop`,
+          userId: existingProfile.id,
+          shopName: `${existingProfile.first_name || 'My'}'s Shop`,
           currency: 'PKR'
         });
         if (setupRes.success && setupRes.shop) {
@@ -498,29 +499,64 @@ async function startServer() {
       return res.json({
         success: true,
         user: {
-          id: profile.id,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          name: profile.name,
-          email: profile.email,
-          role: profile.role,
+          id: existingProfile.id,
+          first_name: existingProfile.first_name,
+          last_name: existingProfile.last_name,
+          name: existingProfile.name,
+          email: existingProfile.email,
+          role: existingProfile.role,
           shop_id: shop ? shop.id : null,
           businessId: shop ? shop.id : null,
           shopName: shop ? shop.name : 'My Shop',
           businessName: shop ? shop.name : 'My Shop',
-          status: profile.status,
-          phone: profile.phone,
+          status: existingProfile.status,
+          phone: existingProfile.phone,
           needsShopSetup: false,
-          createdAt: profile.created_at,
-          lastActive: profile.last_active
+          createdAt: existingProfile.created_at,
+          lastActive: existingProfile.last_active
         },
         shop: shop || null
       });
     }
 
+    // Auto-create profile on the fly if authenticated via Supabase Auth but not in database
+    const namePart = email.split('@')[0];
+    const regResult = shopflowDb.registerNewUser({
+      firstName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
+      lastName: 'User',
+      email: email,
+      shopName: `${namePart.charAt(0).toUpperCase() + namePart.slice(1)}'s Shop`,
+      currency: 'PKR'
+    });
+
+    if (regResult.success && regResult.user) {
+      const newProf = shopflowDb.getProfileByEmail(email);
+      const newShop = newProf?.shop_id ? shopflowDb.getShopById(newProf.shop_id) : null;
+      return res.json({
+        success: true,
+        user: {
+          id: regResult.user.id,
+          first_name: regResult.user.first_name,
+          last_name: regResult.user.last_name,
+          name: regResult.user.name,
+          email: regResult.user.email,
+          role: regResult.user.role,
+          shop_id: regResult.user.shop_id,
+          businessId: regResult.user.shop_id,
+          shopName: regResult.user.shopName,
+          businessName: regResult.user.shopName,
+          status: 'Active',
+          needsShopSetup: false,
+          createdAt: new Date().toISOString(),
+          lastActive: new Date().toISOString()
+        },
+        shop: newShop
+      });
+    }
+
     return res.status(404).json({
       success: false,
-      error: 'User profile not found in database. Please register an account.'
+      error: regResult.error || 'User profile not found in database. Please register an account.'
     });
   });
 

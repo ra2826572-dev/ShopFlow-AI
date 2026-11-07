@@ -119,12 +119,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Strict Admin Password Enforcement: ONLY 59115911 is permitted for admin account
-    if (normalizedEmail === 'ra2826572@gmail.com' && pass !== '59115911') {
-      setLoading(false);
-      return { error: 'Ghalat password! Admin ka password srif "59115911" hai.' };
-    }
-
     try {
       // 1. Try Supabase Auth
       let authUserEmail = normalizedEmail;

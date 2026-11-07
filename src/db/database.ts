@@ -439,13 +439,14 @@ class ShopFlowDatabase {
       // Create initial tenant shop with user provided details & logo
       this.db.prepare(`
         INSERT INTO shops (id, owner_id, name, logo_url, description, category, currency, currency_symbol, tax_rate, phone, address, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 'Retail Store', ?, ?, 5.0, ?, ?, 'Active', ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5.0, ?, ?, 'Active', ?, ?)
       `).run(
         shopId,
         finalUserId,
         finalShopName,
         logoUrl.trim(),
         description.trim(),
+        'Retail Store',
         currency,
         currencySymbol,
         phone.trim() || null,
